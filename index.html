@@ -87,13 +87,19 @@
       const rasenBtn = document.getElementById("rasenBtn");
       const chidoriBtn = document.getElementById("chidoriBtn");
       const cameraBtn = document.getElementById("cameraBtn");
+      const RASEN_JUTSU = rasenBtn.dataset.jutsu;
+      const CHIDORI_JUTSU = chidoriBtn.dataset.jutsu;
+      const JUTSU_LABELS = {
+        [RASEN_JUTSU]: rasenBtn.textContent.trim(),
+        [CHIDORI_JUTSU]: chidoriBtn.textContent.trim(),
+      };
 
       let canvasWidth = 0;
       let canvasHeight = 0;
       let latestResults = null;
       let camera = null;
       let useFrontCamera = true;
-      let currentJutsu = "rasenshuriken";
+      let currentJutsu = RASEN_JUTSU;
       let smoothedPalm = null;
       let lastPalm = null;
       let lastFrameTime = 0;
@@ -101,7 +107,10 @@
       let burstPending = false;
       let sparkAccumulator = 0;
       let particles = [];
-      const LOW_POWER_MODE = (navigator.hardwareConcurrency || 4) <= 4;
+      const deviceMemory = navigator.deviceMemory || 0;
+      const LOW_POWER_MODE =
+        (deviceMemory && deviceMemory <= 4) ||
+        (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
       const PARTICLE_QUALITY = LOW_POWER_MODE ? 0.7 : 1;
       const PARTICLE_GLOW_SCALE = LOW_POWER_MODE ? 0.6 : 1;
       const MAX_PARTICLES = Math.round(500 * PARTICLE_QUALITY);
@@ -124,10 +133,6 @@
       const DEPTH_SCALE_MIN = 0.65;
       const DEPTH_SCALE_MAX = 2.6;
       const PALM_OPEN_THRESHOLD = 0.02;
-      const JUTSU_LABELS = {
-        rasenshuriken: "Rasenshuriken",
-        chidori: "Chidori",
-      };
 
       const hands = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
@@ -233,9 +238,6 @@
 
       function addParticle(particle) {
         particles.push(particle);
-        if (particles.length > MAX_PARTICLES) {
-          particles.splice(0, particles.length - MAX_PARTICLES);
-        }
       }
 
       function spawnBurst(x, y, scale) {
@@ -298,7 +300,8 @@
 
       function updateParticles(dt) {
         let writeIndex = 0;
-        for (let i = 0; i < particles.length; i += 1) {
+        const startIndex = Math.max(0, particles.length - MAX_PARTICLES);
+        for (let i = startIndex; i < particles.length; i += 1) {
           const particle = particles[i];
           particle.age += dt;
           if (particle.age >= particle.life) {
@@ -474,9 +477,9 @@
             handVisible = true;
             statusEl.textContent = `Jutsu: ${JUTSU_LABELS[currentJutsu]} | Hand Detected`;
 
-            if (currentJutsu === "rasenshuriken") {
+            if (currentJutsu === RASEN_JUTSU) {
               drawRasenshuriken(ctx, smoothedPalm.x, smoothedPalm.y, baseRadius * 1.1, time);
-            } else if (currentJutsu === "chidori") {
+            } else if (currentJutsu === CHIDORI_JUTSU) {
               drawChidori(ctx, smoothedPalm.x, smoothedPalm.y, baseRadius, time);
               sparkAccumulator += dt;
               const sparksToSpawn = Math.min(
@@ -516,8 +519,8 @@
 
       function setJutsu(jutsu) {
         currentJutsu = jutsu;
-        rasenBtn.classList.toggle("active", jutsu === "rasenshuriken");
-        chidoriBtn.classList.toggle("active", jutsu === "chidori");
+        rasenBtn.classList.toggle("active", jutsu === RASEN_JUTSU);
+        chidoriBtn.classList.toggle("active", jutsu === CHIDORI_JUTSU);
         burstPending = true;
       }
 
