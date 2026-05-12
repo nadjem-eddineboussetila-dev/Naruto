@@ -88,8 +88,8 @@
       const chidoriBtn = document.getElementById("chidoriBtn");
       const cameraBtn = document.getElementById("cameraBtn");
 
-      let renderWidth = 0;
-      let renderHeight = 0;
+      let canvasWidth = 0;
+      let canvasHeight = 0;
       let latestResults = null;
       let camera = null;
       let useFrontCamera = true;
@@ -112,6 +112,9 @@
       const SPARK_INTERVAL = 0.05;
       const SPARK_BASE_SPEED = 200;
       const SPARK_SPEED_VARIANCE = 220;
+      const MAX_FRAME_TIME = 0.05;
+      const MIN_FRAME_TIME = 0.016;
+      const PALM_SMOOTHING = 0.22;
       const JUTSU_LABELS = {
         rasenshuriken: "Rasenshuriken",
         chidori: "Chidori",
@@ -136,10 +139,10 @@
           return;
         }
         const dpr = window.devicePixelRatio || 1;
-        renderWidth = video.videoWidth;
-        renderHeight = video.videoHeight;
-        canvas.width = renderWidth * dpr;
-        canvas.height = renderHeight * dpr;
+        canvasWidth = video.videoWidth;
+        canvasHeight = video.videoHeight;
+        canvas.width = canvasWidth * dpr;
+        canvas.height = canvasHeight * dpr;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -192,8 +195,8 @@
         );
         const count = ids.length;
         return {
-          x: (sum.x / count) * renderWidth,
-          y: (sum.y / count) * renderHeight,
+          x: (sum.x / count) * canvasWidth,
+          y: (sum.y / count) * canvasHeight,
           z: sum.z / count,
         };
       }
@@ -414,23 +417,23 @@
       }
 
       function render(time) {
-        const dt = Math.min((time - lastFrameTime) / 1000, 0.05);
+        const dt = Math.min((time - lastFrameTime) / 1000, MAX_FRAME_TIME);
         lastFrameTime = time;
-        ctx.clearRect(0, 0, renderWidth, renderHeight);
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         let hasHand = false;
         if (latestResults && latestResults.multiHandLandmarks?.length) {
           const landmarks = latestResults.multiHandLandmarks[0];
-          if (renderWidth && renderHeight) {
+          if (canvasWidth && canvasHeight) {
             const palm = getPalmCenter(landmarks);
             const depthScale = getDepthScale(landmarks);
-            const baseRadius = Math.min(renderWidth, renderHeight) * 0.08 * depthScale;
+            const baseRadius = Math.min(canvasWidth, canvasHeight) * 0.08 * depthScale;
             if (!smoothedPalm) {
               smoothedPalm = { ...palm };
             } else {
-              smoothedPalm.x = lerp(smoothedPalm.x, palm.x, 0.22);
-              smoothedPalm.y = lerp(smoothedPalm.y, palm.y, 0.22);
-              smoothedPalm.z = lerp(smoothedPalm.z, palm.z, 0.22);
+              smoothedPalm.x = lerp(smoothedPalm.x, palm.x, PALM_SMOOTHING);
+              smoothedPalm.y = lerp(smoothedPalm.y, palm.y, PALM_SMOOTHING);
+              smoothedPalm.z = lerp(smoothedPalm.z, palm.z, PALM_SMOOTHING);
             }
 
             if (!handVisible) {
@@ -443,7 +446,7 @@
             if (lastPalm) {
               const dx = smoothedPalm.x - lastPalm.x;
               const dy = smoothedPalm.y - lastPalm.y;
-              const speed = Math.hypot(dx, dy) / Math.max(dt, 0.016);
+              const speed = Math.hypot(dx, dy) / Math.max(dt, MIN_FRAME_TIME);
               if (speed > TRAIL_SPEED_THRESHOLD) {
                 spawnTrail(smoothedPalm.x, smoothedPalm.y, depthScale, speed);
               }
@@ -497,8 +500,8 @@
         burstPending = true;
       }
 
-      rasenBtn.addEventListener("click", () => setJutsu("rasenshuriken"));
-      chidoriBtn.addEventListener("click", () => setJutsu("chidori"));
+      rasenBtn.addEventListener("click", (event) => setJutsu(event.currentTarget.dataset.jutsu));
+      chidoriBtn.addEventListener("click", (event) => setJutsu(event.currentTarget.dataset.jutsu));
       cameraBtn.addEventListener("click", () => {
         useFrontCamera = !useFrontCamera;
         startCamera();
