@@ -96,11 +96,12 @@
       let currentJutsu = "rasenshuriken";
       let smoothedPalm = null;
       let lastPalm = null;
-      let lastFrameTime = performance.now();
+      let lastFrameTime = 0;
       let handVisible = false;
       let burstPending = false;
       let sparkAccumulator = 0;
       const particles = [];
+      let particleCursor = 0;
       const MAX_PARTICLES = 500;
       const TRAIL_SPEED_THRESHOLD = 520;
       const TRAIL_SPEED_PARTICLE_DIVISOR = 220;
@@ -113,8 +114,9 @@
       const SPARK_BASE_SPEED = 200;
       const SPARK_SPEED_VARIANCE = 220;
       const MAX_FRAME_TIME = 0.05;
-      const MIN_FRAME_TIME = 0.016;
       const PALM_SMOOTHING = 0.22;
+      const MAX_HAND_SPEED = 2000;
+      const MAX_SPARKS_PER_FRAME = 6;
       const DEPTH_SCALE_FACTOR = 2.4;
       const DEPTH_SCALE_MIN = 0.65;
       const DEPTH_SCALE_MAX = 2.6;
@@ -227,10 +229,12 @@
       }
 
       function addParticle(particle) {
-        particles.push(particle);
-        while (particles.length > MAX_PARTICLES) {
-          particles.shift();
+        if (particles.length < MAX_PARTICLES) {
+          particles.push(particle);
+          return;
         }
+        particles[particleCursor] = particle;
+        particleCursor = (particleCursor + 1) % MAX_PARTICLES;
       }
 
       function spawnBurst(x, y, scale) {
@@ -292,11 +296,14 @@
       }
 
       function updateParticles(dt) {
-        for (let i = particles.length - 1; i >= 0; i -= 1) {
+        for (let i = 0; i < particles.length; i += 1) {
           const particle = particles[i];
+          if (!particle) {
+            continue;
+          }
           particle.age += dt;
           if (particle.age >= particle.life) {
-            particles.splice(i, 1);
+            particles[i] = null;
             continue;
           }
           particle.vx *= Math.exp(-particle.drag * dt);
@@ -308,6 +315,9 @@
 
       function drawParticles() {
         for (const particle of particles) {
+          if (!particle || particle.age >= particle.life) {
+            continue;
+          }
           const lifeRatio = 1 - particle.age / particle.life;
           ctx.save();
           ctx.globalAlpha = lifeRatio;
@@ -421,6 +431,9 @@
       }
 
       function render(time) {
+        if (!lastFrameTime) {
+          lastFrameTime = time;
+        }
         const dt = Math.min((time - lastFrameTime) / 1000, MAX_FRAME_TIME);
         lastFrameTime = time;
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -450,9 +463,10 @@
             if (lastPalm) {
               const dx = smoothedPalm.x - lastPalm.x;
               const dy = smoothedPalm.y - lastPalm.y;
-              const speed = Math.hypot(dx, dy) / Math.max(dt, MIN_FRAME_TIME);
-              if (speed > TRAIL_SPEED_THRESHOLD) {
-                spawnTrail(smoothedPalm.x, smoothedPalm.y, depthScale, speed);
+              const speed = dt > 0 ? Math.hypot(dx, dy) / dt : 0;
+              const cappedSpeed = Math.min(speed, MAX_HAND_SPEED);
+              if (cappedSpeed > TRAIL_SPEED_THRESHOLD) {
+                spawnTrail(smoothedPalm.x, smoothedPalm.y, depthScale, cappedSpeed);
               }
             }
 
@@ -466,14 +480,18 @@
             } else if (currentJutsu === "chidori") {
               drawChidori(ctx, smoothedPalm.x, smoothedPalm.y, baseRadius, time);
               sparkAccumulator += dt;
-              while (sparkAccumulator > SPARK_INTERVAL) {
+              const sparksToSpawn = Math.min(
+                Math.floor(sparkAccumulator / SPARK_INTERVAL),
+                MAX_SPARKS_PER_FRAME
+              );
+              for (let i = 0; i < sparksToSpawn; i += 1) {
                 spawnSpark(
                   smoothedPalm.x + (Math.random() - 0.5) * baseRadius * 0.6,
                   smoothedPalm.y + (Math.random() - 0.5) * baseRadius * 0.6,
                   depthScale
                 );
-                sparkAccumulator -= SPARK_INTERVAL;
               }
+              sparkAccumulator -= sparksToSpawn * SPARK_INTERVAL;
             }
 
             if (isPalmOpen(landmarks)) {
@@ -515,6 +533,9 @@
       video.addEventListener("loadedmetadata", () => {
         resizeCanvas();
       });
+      if (video.videoWidth && video.videoHeight) {
+        resizeCanvas();
+      }
       window.addEventListener("resize", resizeCanvas);
 
       startCamera();
