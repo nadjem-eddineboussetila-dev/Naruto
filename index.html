@@ -100,7 +100,7 @@
       let handVisible = false;
       let burstPending = false;
       let sparkAccumulator = 0;
-      const particles = [];
+      let particles = [];
       const MAX_PARTICLES = 500;
       const HAND_MODEL_COMPLEXITY = 1;
       const TRAIL_SPEED_THRESHOLD = 520;
@@ -231,7 +231,7 @@
       function addParticle(particle) {
         particles.push(particle);
         if (particles.length > MAX_PARTICLES) {
-          particles.splice(0, particles.length - MAX_PARTICLES);
+          particles = particles.slice(-MAX_PARTICLES);
         }
       }
 
@@ -393,7 +393,7 @@
       }
 
       function drawSharingan(ctx, x, y, radius, time) {
-        const rotationTime = (time ?? performance.now()) * 0.001;
+        const rotationTime = time * 0.001;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotationTime * 0.6);
