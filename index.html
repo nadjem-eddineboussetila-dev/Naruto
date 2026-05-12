@@ -103,7 +103,7 @@
       const particles = [];
       const MAX_PARTICLES = 500;
       const TRAIL_SPEED_THRESHOLD = 520;
-      const TRAIL_SPEED_DIVISOR = 220;
+      const TRAIL_SPEED_PARTICLE_DIVISOR = 220;
       const TRAIL_PARTICLE_MIN = 1;
       const TRAIL_PARTICLE_MAX = 5;
       const BURST_COUNT = 28;
@@ -115,6 +115,10 @@
       const MAX_FRAME_TIME = 0.05;
       const MIN_FRAME_TIME = 0.016;
       const PALM_SMOOTHING = 0.22;
+      const DEPTH_SCALE_FACTOR = 2.4;
+      const DEPTH_SCALE_MIN = 0.65;
+      const DEPTH_SCALE_MAX = 2.6;
+      const PALM_OPEN_THRESHOLD = 0.02;
       const JUTSU_LABELS = {
         rasenshuriken: "Rasenshuriken",
         chidori: "Chidori",
@@ -203,7 +207,7 @@
 
       function getDepthScale(landmarks) {
         const depth = landmarks[9].z || 0;
-        return clamp(1 - depth * 2.4, 0.65, 2.6);
+        return clamp(1 - depth * DEPTH_SCALE_FACTOR, DEPTH_SCALE_MIN, DEPTH_SCALE_MAX);
       }
 
       function isPalmOpen(landmarks) {
@@ -218,7 +222,7 @@
         return fingers.every(([tip, pip]) => {
           const tipDist = distance3D(landmarks[tip], wrist);
           const pipDist = distance3D(landmarks[pip], wrist);
-          return tipDist > pipDist + 0.02;
+          return tipDist > pipDist + PALM_OPEN_THRESHOLD;
         });
       }
 
@@ -250,7 +254,7 @@
 
       function spawnTrail(x, y, scale, speed) {
         const amount = clamp(
-          Math.floor(speed / TRAIL_SPEED_DIVISOR),
+          Math.floor(speed / TRAIL_SPEED_PARTICLE_DIVISOR),
           TRAIL_PARTICLE_MIN,
           TRAIL_PARTICLE_MAX
         );
@@ -500,8 +504,9 @@
         burstPending = true;
       }
 
-      rasenBtn.addEventListener("click", (event) => setJutsu(event.currentTarget.dataset.jutsu));
-      chidoriBtn.addEventListener("click", (event) => setJutsu(event.currentTarget.dataset.jutsu));
+      document.querySelectorAll("[data-jutsu]").forEach((button) => {
+        button.addEventListener("click", (event) => setJutsu(event.currentTarget.dataset.jutsu));
+      });
       cameraBtn.addEventListener("click", () => {
         useFrontCamera = !useFrontCamera;
         startCamera();
