@@ -101,8 +101,8 @@
       let burstPending = false;
       let sparkAccumulator = 0;
       const particles = [];
-      let particleCursor = 0;
       const MAX_PARTICLES = 500;
+      const HAND_MODEL_COMPLEXITY = 1;
       const TRAIL_SPEED_THRESHOLD = 520;
       const TRAIL_SPEED_PARTICLE_DIVISOR = 220;
       const TRAIL_PARTICLE_MIN = 1;
@@ -131,7 +131,7 @@
       });
       hands.setOptions({
         maxNumHands: 1,
-        modelComplexity: 1,
+        modelComplexity: HAND_MODEL_COMPLEXITY,
         minDetectionConfidence: 0.7,
         minTrackingConfidence: 0.7,
       });
@@ -229,12 +229,10 @@
       }
 
       function addParticle(particle) {
-        if (particles.length < MAX_PARTICLES) {
-          particles.push(particle);
-          return;
+        particles.push(particle);
+        if (particles.length > MAX_PARTICLES) {
+          particles.splice(0, particles.length - MAX_PARTICLES);
         }
-        particles[particleCursor] = particle;
-        particleCursor = (particleCursor + 1) % MAX_PARTICLES;
       }
 
       function spawnBurst(x, y, scale) {
@@ -296,28 +294,25 @@
       }
 
       function updateParticles(dt) {
+        let writeIndex = 0;
         for (let i = 0; i < particles.length; i += 1) {
           const particle = particles[i];
-          if (!particle) {
-            continue;
-          }
           particle.age += dt;
           if (particle.age >= particle.life) {
-            particles[i] = null;
             continue;
           }
           particle.vx *= Math.exp(-particle.drag * dt);
           particle.vy *= Math.exp(-particle.drag * dt);
           particle.x += particle.vx * dt;
           particle.y += particle.vy * dt;
+          particles[writeIndex] = particle;
+          writeIndex += 1;
         }
+        particles.length = writeIndex;
       }
 
       function drawParticles() {
         for (const particle of particles) {
-          if (!particle || particle.age >= particle.life) {
-            continue;
-          }
           const lifeRatio = 1 - particle.age / particle.life;
           ctx.save();
           ctx.globalAlpha = lifeRatio;
@@ -397,11 +392,11 @@
         ctx.restore();
       }
 
-      function drawSharingan(ctx, x, y, radius) {
-        const time = performance.now() * 0.001;
+      function drawSharingan(ctx, x, y, radius, time) {
+        const rotationTime = (time ?? performance.now()) * 0.001;
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(time * 0.6);
+        ctx.rotate(rotationTime * 0.6);
         ctx.fillStyle = "#c61212";
         ctx.beginPath();
         ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -495,7 +490,7 @@
             }
 
             if (isPalmOpen(landmarks)) {
-              drawSharingan(ctx, smoothedPalm.x, smoothedPalm.y, baseRadius * 0.65);
+              drawSharingan(ctx, smoothedPalm.x, smoothedPalm.y, baseRadius * 0.65, time);
             }
           }
         }
